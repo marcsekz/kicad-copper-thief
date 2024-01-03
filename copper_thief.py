@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 import numpy as np
+import math
 import wx
 import pcbnew
 import os
@@ -10,9 +11,17 @@ from . import CopperThiefDlg
 THIEVING_ZONENAMES = ['thieving', 'theiving', 'thief', 'theif', 'dotsarray']
 
 
-def FromMM(x):
-    return pcbnew.FromMM(float(x))
+def FromMM(x) -> int:
+    return int(pcbnew.FromMM(float(x)))
 
+def ToMM(x) -> float:
+    return pcbnew.ToMM(float(x))
+
+def distance(x1: float, y1: float, x2: float, y2: float) -> float:
+    return math.sqrt(math.pow(x1-x2, 2) + math.pow(y1-y2, 2))
+
+def touching_npth(npth_object: list, dot_x: float, dot_y: float, clearance: float) -> bool:
+    return distance(npth_object[0], npth_object[1], dot_x, dot_y) < (npth_object[2] + clearance)
 
 class StreamToLogger(object):
 
@@ -81,8 +90,6 @@ class Copper_Thief(pcbnew.ActionPlugin):
 
     def Run(self):
 
-
-
         board = pcbnew.GetBoard()
         windows = [x for x in wx.GetTopLevelWindows()]
 
@@ -97,10 +104,12 @@ class Copper_Thief(pcbnew.ActionPlugin):
 
         aParameters.m_spacing.SetValue("2")
         aParameters.m_radius.SetValue("0.5")
+        aParameters.m_clearance.SetValue("3")
         modal_result = aParameters.ShowModal()
         if modal_result == wx.ID_OK:
             spacing = float(aParameters.m_spacing.GetValue())
             radius = float(aParameters.m_radius.GetValue())
+            clearance = float(aParameters.m_clearance.GetValue())
             logger.info(f"Spacing {spacing}")
             zones = []
             for z in board.Zones():
@@ -111,8 +120,8 @@ class Copper_Thief(pcbnew.ActionPlugin):
             for zone in zones:
                 zonename = zone.GetZoneName()
                 if zonename.lower() in THIEVING_ZONENAMES:
-                    dotter.apply_dots(zone, spacing=spacing, radius=radius)
-                    #board.Remove(zone)
+                    dotter.apply_dots(zone, spacing=spacing, radius=radius, clearance_multiplier=clearance)
+                    board.Remove(zone)
                 else:
                     wx.MessageBox("Zone name must be \"theiving\".", "Check zone name.", wx.OK)
         aParameters.Destroy()
@@ -123,26 +132,46 @@ class Dotter():
     def __init__(self):
         self.pcb = pcbnew.GetBoard()
 
-    def apply_dots(self, zone, spacing=2, radius=0.5):
+    def apply_dots(self, zone, spacing=2, radius=0.5, clearance_multiplier=3):
         """Iterate over the zone area and add dots if inside the zone."""
         zones = self.pcb.Zones()
         layer = zone.GetLayer()
         
+        self.clearance_factor = clearance_multiplier
+        
+        pads = self.pcb.GetPads()
+        
+        npth_pad_coords = list()
+        
+        for p in pads:
+            t = p.GetAttribute()
+            if t == pcbnew.PAD_ATTRIB_NPTH:
+                npth_pad_coords.append(
+                    list([
+                        ToMM(p.GetX()),
+                        ToMM(p.GetY()),
+                        ToMM(max(p.GetDrillSizeX(),p.GetDrillSizeY())) / 2
+                    ])
+                )
+        
         # Get the zone outline and deflate it so we don't put dots to close to the outside
         zone_outline = zone.Outline()
-        zone_outline.Deflate(FromMM(radius), 16)
+        zone_outline.Deflate(FromMM(self.clearance_factor * radius), 16)
         zone.SetOutline(zone_outline)
-        
-        
-        bbox = zone.GetBoundingBox()
-        zonepolys = zone.GetFilledPolysList(layer)
         
         # Increase the clearance so we move even further away from existing copper
         clearance = zone.GetLocalClearance()
-        zone.SetLocalClearance(clearance + int(radius * 1e6))
+        zone.SetLocalClearance(clearance + int(FromMM(self.clearance_factor * radius)))
         zone.SetNeedRefill(True)
         filler = pcbnew.ZONE_FILLER(self.pcb)
         filler.Fill(zones)
+        
+        bbox = zone.GetBoundingBox()
+        zonepolys = zone.GetFilledPolysList(layer)
+
+        board_edge = pcbnew.SHAPE_POLY_SET()
+        self.pcb.GetBoardPolygonOutlines(board_edge)
+        board_edge.Deflate(FromMM(self.clearance_factor * radius), 16, pcbnew.SHAPE_POLY_SET.ROUND_ALL_CORNERS)
 
         # Find any keep out zones to check later when we're dotting
         keep_out_zones = []
@@ -151,17 +180,25 @@ class Dotter():
                 keep_out_zones.append(koz)
         
         # Iterate over the bounding box of the chosen zone
-        for x in np.arange(bbox.GetLeft() / 1e6, bbox.GetRight() / 1e6, spacing):
-            for y in np.arange(bbox.GetTop() / 1e6, bbox.GetBottom() / 1e6, spacing):
-                # If the dot centre is inside the the deflated zone poly, we're ok to place a dot
-                if zonepolys.Collide(pcbnew.VECTOR2I(FromMM(x), FromMM(y))):#, FromMM(radius)):
+        for x in np.arange(ToMM(bbox.GetLeft()), ToMM(bbox.GetRight()), spacing):
+            for y in np.arange(ToMM(bbox.GetTop()), ToMM(bbox.GetBottom()), spacing):
+                # If the dot centre is inside the the deflated zone poly and the deflated board outline,
+                # we're ok to place a dot
+                coords = pcbnew.VECTOR2I(FromMM(x), FromMM(y))
+                if zonepolys.Collide(coords) and board_edge.Collide(coords):
                     # Check that the dot wont touch any keep out zones
                     touch_keepout = False
                     for koz in keep_out_zones:
-                        if koz.Outline().Collide(pcbnew.VECTOR2I(FromMM(x), FromMM(y)), FromMM(radius)):
+                        if koz.Outline().Collide(coords, FromMM(self.clearance_factor * radius)):
                             touch_keepout = True
-                            
-                    if not touch_keepout:
+                    
+                    # Check for enough clearance around NPTH
+                    touch_npth = False
+                    for npth in npth_pad_coords:
+                        if touching_npth(npth, x, y, self.clearance_factor * radius):
+                            touch_npth = True
+                    
+                    if not touch_keepout and not touch_npth:
                         dot = self.create_dot(layer, x, y, radius, 1)
                         self.pcb.Add(dot)
         
@@ -177,8 +214,8 @@ class Dotter():
         """Create a dot."""
         print(f"Creating dot at {x}, {y} with radius {r}")
 
-        center = pcbnew.wxPoint(FromMM(x), FromMM(y))
-        start = pcbnew.wxPoint(FromMM(x + r), FromMM(y))
+        center = pcbnew.VECTOR2I(FromMM(x), FromMM(y))
+        start = pcbnew.VECTOR2I(FromMM(x + r), FromMM(y))
         dot = pcbnew.PCB_SHAPE(self.pcb)
         dot.SetShape(pcbnew.S_CIRCLE)
         dot.SetLayer(layer)

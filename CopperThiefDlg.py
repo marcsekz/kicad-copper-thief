@@ -51,6 +51,19 @@ class CopperThiefDlg(Dialog):
 
         bSizer3.Add(bSizerRad, 1, EXPAND, 5)
 
+        ###
+        bSizerClearance = BoxSizer(HORIZONTAL)
+
+        self.m_labelClearance = StaticText(self, ID_ANY, u"Clearance multiplier  ", DefaultPosition, DefaultSize, 0)
+        self.m_labelClearance.Wrap(-1)
+        self.m_clearance = TextCtrl(self, ID_ANY, u"3", DefaultPosition, DefaultSize, 0)
+        self.m_clearance.SetMinSize(Size(1000, -1))
+
+        bSizerClearance.Add(self.m_labelClearance, 1, ALL | EXPAND, 5)
+        bSizerClearance.Add(self.m_clearance, 1, ALL, 5)
+
+        bSizer3.Add(bSizerClearance, 1, EXPAND, 5)
+
         #
         bSizer1 = BoxSizer(HORIZONTAL)
 
