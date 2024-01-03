@@ -9,6 +9,7 @@ import sys
 import logging
 from . import CopperThiefDlg
 THIEVING_ZONENAMES = ['thieving', 'theiving', 'thief', 'theif', 'dotsarray']
+THIEVING_GROUPNAME = 'copper-thief-group'
 
 
 def FromMM(x) -> int:
@@ -137,6 +138,17 @@ class Dotter():
         zones = self.pcb.Zones()
         layer = zone.GetLayer()
         
+        self.group = None
+        
+        for group in self.pcb.Groups():
+            if group.GetName() == THIEVING_GROUPNAME:
+                self.group = group
+        
+        if self.group == None:
+            self.group = pcbnew.PCB_GROUP(None)
+            self.group.SetName(THIEVING_GROUPNAME)
+            self.pcb.Add(self.group)
+        
         self.clearance_factor = clearance_multiplier
         
         pads = self.pcb.GetPads()
@@ -224,6 +236,8 @@ class Dotter():
         dot.SetWidth(width)
         dot.SetCenter(center)
         dot.SetFilled(True)
+        
+        self.group.AddItem(dot)
         return dot
 
     def RefillBoardAreas(self):
