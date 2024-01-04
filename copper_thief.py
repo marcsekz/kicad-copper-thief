@@ -106,6 +106,9 @@ class Copper_Thief(pcbnew.ActionPlugin):
         aParameters.m_spacing.SetValue("2")
         aParameters.m_radius.SetValue("0.5")
         aParameters.m_clearance.SetValue("3")
+        aParameters.m_pattern.SetSelection(0)
+        aParameters.m_cleanup.SetValue(wx.CHK_CHECKED)
+        
         modal_result = aParameters.ShowModal()
         if modal_result == wx.ID_OK:
             spacing = float(aParameters.m_spacing.GetValue())
@@ -130,8 +133,9 @@ class Copper_Thief(pcbnew.ActionPlugin):
 
 class Dotter():
 
-    def __init__(self):
+    def __init__(self, square=True):
         self.pcb = pcbnew.GetBoard()
+        self.square = square
 
     def apply_dots(self, zone, spacing=2, radius=0.5, clearance_multiplier=3):
         """Iterate over the zone area and add dots if inside the zone."""
@@ -211,7 +215,7 @@ class Dotter():
                             touch_npth = True
                     
                     if not touch_keepout and not touch_npth:
-                        dot = self.create_dot(layer, x, y, radius, 1)
+                        dot = self.create_dot(layer, x, y, radius, 0)
                         self.pcb.Add(dot)
         
         # Reset the zone clearance
@@ -226,16 +230,27 @@ class Dotter():
         """Create a dot."""
         print(f"Creating dot at {x}, {y} with radius {r}")
 
-        center = pcbnew.VECTOR2I(FromMM(x), FromMM(y))
-        start = pcbnew.VECTOR2I(FromMM(x + r), FromMM(y))
-        dot = pcbnew.PCB_SHAPE(self.pcb)
-        dot.SetShape(pcbnew.S_CIRCLE)
-        dot.SetLayer(layer)
-        dot.SetStart(start)
-        dot.SetEnd(start)
-        dot.SetWidth(width)
-        dot.SetCenter(center)
-        dot.SetFilled(True)
+        if not self.square:
+            center = pcbnew.VECTOR2I(FromMM(x), FromMM(y))
+            start = pcbnew.VECTOR2I(FromMM(x + r), FromMM(y))
+            dot = pcbnew.PCB_SHAPE(self.pcb)
+            dot.SetShape(pcbnew.S_CIRCLE)
+            dot.SetLayer(layer)
+            dot.SetStart(start)
+            dot.SetEnd(start)
+            dot.SetWidth(width)
+            dot.SetCenter(center)
+            dot.SetFilled(True)
+        else:
+            start = pcbnew.VECTOR2I(FromMM(x-r), FromMM(y-r))
+            end = pcbnew.VECTOR2I(FromMM(x+r), FromMM(y+r))
+            dot = pcbnew.PCB_SHAPE(self.pcb)
+            dot.SetShape(pcbnew.S_RECT)
+            dot.SetLayer(layer)
+            dot.SetStart(start)
+            dot.SetEnd(end)
+            dot.SetWidth(width)
+            dot.SetFilled(True)
         
         self.group.AddItem(dot)
         return dot

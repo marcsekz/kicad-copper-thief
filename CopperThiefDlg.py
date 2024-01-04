@@ -3,10 +3,10 @@
 
 
 from wx import ID_ANY, DefaultPosition, Size, DefaultSize, ALL, EXPAND, \
-    HORIZONTAL, VERTICAL, Dialog, BoxSizer, StaticText, TextCtrl, \
+    HORIZONTAL, VERTICAL, Dialog, BoxSizer, StaticText, TextCtrl, ComboBox, CheckBox, \
     CAPTION, CLOSE_BOX, DEFAULT_DIALOG_STYLE, RESIZE_BORDER, \
     Button, ALIGN_CENTER_VERTICAL, ID_OK, \
-    ID_CANCEL, ALIGN_RIGHT, BOTH
+    ID_CANCEL, ALIGN_RIGHT, BOTH, CHK_CHECKED, CHK_UNCHECKED
 # import wx.xrc
 
 
@@ -63,6 +63,34 @@ class CopperThiefDlg(Dialog):
         bSizerClearance.Add(self.m_clearance, 1, ALL, 5)
 
         bSizer3.Add(bSizerClearance, 1, EXPAND, 5)
+        
+        ###
+        bSizerPattern = BoxSizer(HORIZONTAL)
+
+        self.m_labelPattern = StaticText(self, ID_ANY, u"Thieving pattern  ", DefaultPosition, DefaultSize, 0)
+        self.m_labelPattern.Wrap(-1)
+
+        self.m_pattern_list = [ u"Squares", u"Dots in square grid", u"Dots in triangular grid"]
+        self.m_pattern = ComboBox( self, ID_ANY, u"Squares", DefaultPosition, DefaultSize, self.m_pattern_list)
+        self.m_pattern.SetMinSize(Size(1000, -1))
+
+        bSizerPattern.Add(self.m_labelPattern, 1, ALL | EXPAND, 5)
+        bSizerPattern.Add(self.m_pattern, 1, ALL, 5)
+
+        bSizer3.Add(bSizerPattern, 1, EXPAND, 5)
+        
+        ###
+        bSizerCleanup = BoxSizer(HORIZONTAL)
+        self.m_labelCleanup = StaticText(self, ID_ANY, u"Clean up thieving zone  ", DefaultPosition, DefaultSize, 0)
+        self.m_labelCleanup.Wrap(-1)
+        
+        self.m_cleanup = CheckBox(self)
+        self.m_cleanup.SetMinSize(Size(1000, -1))
+        
+        bSizerCleanup.Add(self.m_labelCleanup, 1, ALL | EXPAND, 5)
+        bSizerCleanup.Add(self.m_cleanup, 1, ALL, 5)
+        
+        bSizer3.Add(bSizerCleanup, 1, EXPAND, 5)
 
         #
         bSizer1 = BoxSizer(HORIZONTAL)
