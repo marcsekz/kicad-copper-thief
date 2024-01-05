@@ -127,9 +127,14 @@ class Copper_Thief(pcbnew.ActionPlugin):
             for zone in zones:
                 zonename = zone.GetZoneName()
                 if zonename.lower() in THIEVING_ZONENAMES:
+                    zone_backup = zone.Duplicate()
                     dotter.apply_dots(zone, spacing=spacing, radius=radius, clearance_multiplier=clearance)
+                    board.Add(zone_backup)
                     if cleanup:
-                        board.Remove(zone)
+                        board.Remove(zone_backup)
+                    board.Remove(zone)
+                    filler = pcbnew.ZONE_FILLER(board)
+                    filler.Fill(board.Zones())
                 else:
                     wx.MessageBox("Zone name must be \"theiving\".", "Check zone name.", wx.OK)
         aParameters.Destroy()
@@ -177,6 +182,7 @@ class Dotter():
         # Get the zone outline and deflate it so we don't put dots to close to the outside
         zone_outline = zone.Outline()
         zone_outline.Deflate(FromMM(self.clearance_factor * radius), 16)
+        zone.SetOutline(zone_outline)
         
         # Increase the clearance so we move even further away from existing copper
         clearance = zone.GetLocalClearance()

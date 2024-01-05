@@ -14,11 +14,11 @@ Clone the repository into your local plugin folder
 ## Usage:
 
 * Draw a zone and leave it unconnected to any net. (This allows the zone to
-    create unconnected copper fills).
+    create unconnected copper fills). **For now only single-layer zones are supported**
 * Set the zone name to "thieving".
 * Select the zone
 * Click on the Copper Thief icon
-* Set the separation and dot radius parameters
+* Set the separation and dot diameter parameters, the thieving pattern, and if the zone you created can be deleted by the script
 * Go!
 
 ## WARNING:
