@@ -104,7 +104,7 @@ class Copper_Thief(pcbnew.ActionPlugin):
         aParameters = CopperThief_Dlg(parent_frame)
 
         aParameters.m_spacing.SetValue("2")
-        aParameters.m_radius.SetValue("0.5")
+        aParameters.m_diameter.SetValue("1")
         aParameters.m_clearance.SetValue("3")
         aParameters.m_pattern.SetSelection(0)
         aParameters.m_cleanup.SetValue(wx.CHK_CHECKED)
@@ -112,7 +112,7 @@ class Copper_Thief(pcbnew.ActionPlugin):
         modal_result = aParameters.ShowModal()
         if modal_result == wx.ID_OK:
             spacing = float(aParameters.m_spacing.GetValue())
-            radius = float(aParameters.m_radius.GetValue())
+            radius = float(aParameters.m_diameter.GetValue()) / 2
             clearance = float(aParameters.m_clearance.GetValue())
             pattern = int(aParameters.m_pattern.GetCurrentSelection())
             cleanup = bool(aParameters.m_cleanup.GetValue() == wx.CHK_CHECKED)
@@ -214,8 +214,9 @@ class Dotter():
             offsetX = 0
         
         # Iterate over the bounding box of the chosen zone
-        even_row = False
+        
         for x in np.arange(ToMM(bbox.GetLeft()), ToMM(bbox.GetRight()), spacingX):
+            even_row = False
             for y in np.arange(ToMM(bbox.GetTop()), ToMM(bbox.GetBottom()), spacingY):
                 # If the dot centre is inside the the deflated zone poly and the deflated board outline,
                 # we're ok to place a dot

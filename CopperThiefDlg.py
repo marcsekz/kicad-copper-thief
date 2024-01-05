@@ -41,13 +41,13 @@ class CopperThiefDlg(Dialog):
         ###
         bSizerRad = BoxSizer(HORIZONTAL)
 
-        self.m_labelRad = StaticText(self, ID_ANY, u"Dot Radius  (mm)  ", DefaultPosition, DefaultSize, 0)
+        self.m_labelRad = StaticText(self, ID_ANY, u"Dot Diameter  (mm)  ", DefaultPosition, DefaultSize, 0)
         self.m_labelRad.Wrap(-1)
-        self.m_radius = TextCtrl(self, ID_ANY, u"0.5", DefaultPosition, DefaultSize, 0)
-        self.m_radius.SetMinSize(Size(200, -1))
+        self.m_diameter = TextCtrl(self, ID_ANY, u"1.0", DefaultPosition, DefaultSize, 0)
+        self.m_diameter.SetMinSize(Size(200, -1))
 
         bSizerRad.Add(self.m_labelRad, 1, ALL | EXPAND, 5)
-        bSizerRad.Add(self.m_radius, 1, ALL, 5)
+        bSizerRad.Add(self.m_diameter, 1, ALL, 5)
 
         bSizer3.Add(bSizerRad, 1, EXPAND, 5)
 
