@@ -8,6 +8,7 @@ import os
 import sys
 import logging
 from . import CopperThiefDlg
+from . import copper_thief_defaults
 THIEVING_ZONENAMES = ['thieving', 'theiving', 'thief', 'theif', 'dotsarray']
 THIEVING_GROUPNAME = 'copper-thief-group'
 
@@ -103,11 +104,11 @@ class Copper_Thief(pcbnew.ActionPlugin):
         print(parent_frame)
         aParameters = CopperThief_Dlg(parent_frame)
 
-        aParameters.m_spacing.SetValue("2")
-        aParameters.m_diameter.SetValue("1")
-        aParameters.m_clearance.SetValue("3")
-        aParameters.m_pattern.SetSelection(0)
-        aParameters.m_cleanup.SetValue(wx.CHK_CHECKED)
+        aParameters.m_spacing.SetValue(copper_thief_defaults.default_spacing)
+        aParameters.m_diameter.SetValue(copper_thief_defaults.default_diameter)
+        aParameters.m_clearance.SetValue(copper_thief_defaults.default_clearance)
+        aParameters.m_pattern.SetSelection(copper_thief_defaults.default_pattern)
+        aParameters.m_cleanup.SetValue(copper_thief_defaults.default_cleanup)
         
         modal_result = aParameters.ShowModal()
         if modal_result == wx.ID_OK:

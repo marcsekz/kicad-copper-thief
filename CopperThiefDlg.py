@@ -8,6 +8,7 @@ from wx import ID_ANY, DefaultPosition, Size, DefaultSize, ALL, EXPAND, \
     Button, ALIGN_CENTER_VERTICAL, ID_OK, \
     ID_CANCEL, ALIGN_RIGHT, BOTH, CHK_CHECKED, CHK_UNCHECKED
 # import wx.xrc
+from . import copper_thief_defaults
 
 
 class CopperThiefDlg(Dialog):
@@ -15,7 +16,8 @@ class CopperThiefDlg(Dialog):
     """Gui for Copper Thief widget."""
 
     def __init__(self, parent):
-        Dialog.__init__(self, parent, id=ID_ANY, title=u"Copper Thief Parameters", pos=DefaultPosition, size=Size(432, 532), style=CAPTION | CLOSE_BOX | DEFAULT_DIALOG_STYLE | RESIZE_BORDER)
+        Dialog.__init__(self, parent, id=ID_ANY, title=u"Copper Thief Parameters", pos=DefaultPosition, 
+                        size=Size(432, 532), style=CAPTION | CLOSE_BOX | DEFAULT_DIALOG_STYLE | RESIZE_BORDER)
 
         self.SetSizeHints(DefaultSize, DefaultSize)
 
@@ -30,7 +32,7 @@ class CopperThiefDlg(Dialog):
 
         self.m_labelSep = StaticText(self, ID_ANY, u"Dot Separation  (mm)  ", DefaultPosition, DefaultSize, 0)
         self.m_labelSep.Wrap(-1)
-        self.m_spacing = TextCtrl(self, ID_ANY, u"2", DefaultPosition, DefaultSize, 0)
+        self.m_spacing = TextCtrl(self, ID_ANY, copper_thief_defaults.default_spacing, DefaultPosition, DefaultSize, 0)
         self.m_spacing.SetMinSize(Size(200, -1))
 
         bSizerSep.Add(self.m_labelSep, 1, ALL | EXPAND, 5)
@@ -43,7 +45,8 @@ class CopperThiefDlg(Dialog):
 
         self.m_labelRad = StaticText(self, ID_ANY, u"Dot Diameter  (mm)  ", DefaultPosition, DefaultSize, 0)
         self.m_labelRad.Wrap(-1)
-        self.m_diameter = TextCtrl(self, ID_ANY, u"1.0", DefaultPosition, DefaultSize, 0)
+        self.m_diameter = TextCtrl(self, ID_ANY, copper_thief_defaults.default_diameter,
+                                   DefaultPosition, DefaultSize, 0)
         self.m_diameter.SetMinSize(Size(200, -1))
 
         bSizerRad.Add(self.m_labelRad, 1, ALL | EXPAND, 5)
@@ -56,7 +59,8 @@ class CopperThiefDlg(Dialog):
 
         self.m_labelClearance = StaticText(self, ID_ANY, u"Clearance multiplier  ", DefaultPosition, DefaultSize, 0)
         self.m_labelClearance.Wrap(-1)
-        self.m_clearance = TextCtrl(self, ID_ANY, u"3", DefaultPosition, DefaultSize, 0)
+        self.m_clearance = TextCtrl(self, ID_ANY, copper_thief_defaults.default_clearance,
+                                    DefaultPosition, DefaultSize, 0)
         self.m_clearance.SetMinSize(Size(200, -1))
 
         bSizerClearance.Add(self.m_labelClearance, 1, ALL | EXPAND, 5)
@@ -71,7 +75,8 @@ class CopperThiefDlg(Dialog):
         self.m_labelPattern.Wrap(-1)
 
         self.m_pattern_list = [ u"Squares", u"Dots in square grid", u"Dots in triangular grid"]
-        self.m_pattern = ComboBox( self, ID_ANY, u"Squares", DefaultPosition, DefaultSize, self.m_pattern_list)
+        self.m_pattern = ComboBox( self, ID_ANY, self.m_pattern_list[copper_thief_defaults.default_pattern],
+                                  DefaultPosition, DefaultSize, self.m_pattern_list)
         self.m_pattern.SetMinSize(Size(200, -1))
 
         bSizerPattern.Add(self.m_labelPattern, 1, ALL | EXPAND, 5)
