@@ -176,7 +176,7 @@ class Dotter():
                     list([
                         ToMM(p.GetX()),
                         ToMM(p.GetY()),
-                        ToMM(max(p.GetDrillSizeX(),p.GetDrillSizeY())) / 2
+                        ToMM(max(p.GetDrillSizeX(),p.GetDrillSizeY()) / 2 + p.GetLocalClearance())
                     ])
                 )
         
