@@ -152,6 +152,8 @@ class Dotter():
         zones = self.pcb.Zones()
         layer = zone.GetLayer()
         
+        maxerror = 1
+        
         self.group = None
         
         for group in self.pcb.Groups():
@@ -182,7 +184,7 @@ class Dotter():
         
         # Get the zone outline and deflate it so we don't put dots to close to the outside
         zone_outline = zone.Outline()
-        zone_outline.Deflate(FromMM(self.clearance_factor * radius), 16)
+        zone_outline.Deflate(FromMM(self.clearance_factor * radius), 16, maxerror)
         zone.SetOutline(zone_outline)
         
         # Increase the clearance so we move even further away from existing copper
@@ -197,7 +199,7 @@ class Dotter():
 
         board_edge = pcbnew.SHAPE_POLY_SET()
         self.pcb.GetBoardPolygonOutlines(board_edge)
-        board_edge.Deflate(FromMM(self.clearance_factor * radius), 16, pcbnew.SHAPE_POLY_SET.ROUND_ALL_CORNERS)
+        board_edge.Deflate(FromMM(self.clearance_factor * radius), 16, maxerror)
 
         # Find any keep out zones to check later when we're dotting
         keep_out_zones = []
