@@ -178,9 +178,10 @@ class Dotter():
                     list([
                         ToMM(p.GetX()),
                         ToMM(p.GetY()),
-                        ToMM(max(p.GetDrillSizeX(),p.GetDrillSizeY()) / 2 + p.GetLocalClearance())
+                        ToMM(max(p.GetDrillSizeX(),p.GetDrillSizeY()) / 2 + (p.GetLocalClearance() or 0))
                     ])
                 )
+
         
         # Get the zone outline and deflate it so we don't put dots to close to the outside
         zone_outline = zone.Outline()
