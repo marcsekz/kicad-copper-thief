@@ -143,6 +143,8 @@ class Copper_Thief(pcbnew.ActionPlugin):
                 1: "circles",
                 2: "circles",
                 3: "hexagons",
+                4: "diamonds",
+                5: "diamonds",  # legacy index fallback
             }
             
             logger.info(f"Spacing {spacing}")
@@ -184,13 +186,23 @@ class Dotter():
 
     def __init__(self, pattern: int):
         self.pcb = pcbnew.GetBoard()
-        self.pattern = pattern # [ u"Squares", u"Dots in square grid", u"Dots in triangular grid", u"Hexagons"]
+        self.pattern = pattern # [ u"Squares", u"Dots in square grid", u"Dots in triangular grid", u"Hexagons", u"Diamonds"]
+
+    def _shape_radius_multiplier(self) -> float:
+        # Keep dot diameter as the single user control; tune only new shapes so
+        # copper coverage is closer to circles at the same nominal diameter.
+        multipliers = {
+            4: math.sqrt(math.pi/2),  # diamonds (area of rhombus with diagonal radius)
+            5: math.sqrt(math.pi/2),  # legacy index fallback
+        }
+        return multipliers.get(self.pattern, 1.0)
 
     def apply_dots(self, zone, spacing: float = 2, radius: float = 0.5, clearance_multiplier: float = 3):
         """Iterate over the zone area and add dots if inside the zone."""
         zones = board_zones(self.pcb)
         layer = zone.GetLayer()
         created_count = 0
+        shape_radius = radius * self._shape_radius_multiplier()
         
         maxerror = 1
         
@@ -225,12 +237,12 @@ class Dotter():
         
         # Get the zone outline and deflate it so we don't put dots to close to the outside
         zone_outline = zone.Outline()
-        zone_outline.Deflate(FromMM(self.clearance_factor * radius), 16, maxerror)
+        zone_outline.Deflate(FromMM(self.clearance_factor * shape_radius), 16, maxerror)
         zone.SetOutline(zone_outline)
         
         # Increase the clearance so we move even further away from existing copper
         clearance = to_int_or_zero(zone.GetLocalClearance())
-        zone.SetLocalClearance(clearance + int(FromMM(self.clearance_factor * radius)))
+        zone.SetLocalClearance(clearance + int(FromMM(self.clearance_factor * shape_radius)))
         zone.SetNeedRefill(True)
         filler = pcbnew.ZONE_FILLER(self.pcb)
         filler.Fill(zones)
@@ -243,7 +255,7 @@ class Dotter():
             self.pcb.GetBoardPolygonOutlines(board_edge)
         except TypeError:
             self.pcb.GetBoardPolygonOutlines(board_edge, False)
-        board_edge.Deflate(FromMM(self.clearance_factor * radius), 16, maxerror)
+        board_edge.Deflate(FromMM(self.clearance_factor * shape_radius), 16, maxerror)
 
         # Find any keep out zones to check later when we're dotting
         keep_out_zones = []
@@ -253,13 +265,15 @@ class Dotter():
             elif hasattr(koz, 'IsRuleArea') and koz.IsRuleArea():
                 keep_out_zones.append(koz)
         
-        spacingX = spacing
+        min_center_pitch = 2.0 * shape_radius
+        spacing_center = max(spacing, min_center_pitch)
+        spacingX = spacing_center
         
-        if self.pattern >= 2:
-            spacingY = math.cos(math.radians(30)) * spacing
-            offsetX = 0.5 * spacing
+        if self.pattern == 2:
+            spacingY = math.cos(math.radians(30)) * spacing_center
+            offsetX = 0.5 * spacing_center
         else:
-            spacingY = spacing
+            spacingY = spacing_center
             offsetX = 0
         
         # Iterate over the bounding box of the chosen zone
@@ -276,17 +290,17 @@ class Dotter():
                     # Check that the dot wont touch any keep out zones
                     touch_keepout = False
                     for koz in keep_out_zones:
-                        if koz.Outline().Collide(coords, FromMM(self.clearance_factor * radius)):
+                        if koz.Outline().Collide(coords, FromMM(self.clearance_factor * shape_radius)):
                             touch_keepout = True
                     
                     # Check for enough clearance around NPTH
                     touch_npth = False
                     for npth in npth_pad_coords:
-                        if touching_npth(npth, x_offs, y, self.clearance_factor * radius):
+                        if touching_npth(npth, x_offs, y, self.clearance_factor * shape_radius):
                             touch_npth = True
                     
                     if not touch_keepout and not touch_npth:
-                        dot = self.create_dot(layer, x_offs, y, radius, 0)
+                        dot = self.create_dot(layer, x_offs, y, shape_radius, 0)
                         self.pcb.Add(dot)
                         created_count += 1
         
@@ -323,6 +337,29 @@ class Dotter():
             dot.SetEnd(start)
             dot.SetWidth(width)
             dot.SetCenter(center)
+            dot.SetFilled(True)
+        elif self.pattern == 3:
+            wxPointList = pcbnew.VECTOR_VECTOR2I()
+            for alpha in range(0,360,60):
+                wxPointList.append(pcbnew.VECTOR2I(FromMM(x + r*math.sin(math.radians(alpha))), FromMM(y + r*math.cos(math.radians(alpha)))))
+            dot = pcbnew.PCB_SHAPE(self.pcb)
+            dot.SetShape(pcbnew.S_POLYGON)
+            dot.SetLayer(layer)
+            dot.SetPolyPoints(wxPointList)
+            dot.SetWidth(width)
+            dot.SetFilled(True)
+        elif self.pattern in (4, 5):
+            wxPointList = pcbnew.VECTOR_VECTOR2I()
+            wxPointList.append(pcbnew.VECTOR2I(FromMM(x), FromMM(y - r)))
+            wxPointList.append(pcbnew.VECTOR2I(FromMM(x + r), FromMM(y)))
+            wxPointList.append(pcbnew.VECTOR2I(FromMM(x), FromMM(y + r)))
+            wxPointList.append(pcbnew.VECTOR2I(FromMM(x - r), FromMM(y)))
+
+            dot = pcbnew.PCB_SHAPE(self.pcb)
+            dot.SetShape(pcbnew.S_POLYGON)
+            dot.SetLayer(layer)
+            dot.SetPolyPoints(wxPointList)
+            dot.SetWidth(width)
             dot.SetFilled(True)
         else:
             wxPointList = pcbnew.VECTOR_VECTOR2I()

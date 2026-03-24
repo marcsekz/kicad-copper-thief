@@ -30,7 +30,7 @@ class CopperThiefDlg(Dialog):
 
         bSizerSep = BoxSizer(HORIZONTAL)
 
-        self.m_labelSep = StaticText(self, ID_ANY, u"Dot Separation  (mm)  ", DefaultPosition, DefaultSize, 0)
+        self.m_labelSep = StaticText(self, ID_ANY, u"Dot Separation (center, mm)  ", DefaultPosition, DefaultSize, 0)
         self.m_labelSep.Wrap(-1)
         self.m_spacing = TextCtrl(self, ID_ANY, copper_thief_defaults.default_spacing, DefaultPosition, DefaultSize, 0)
         self.m_spacing.SetMinSize(Size(200, -1))
@@ -74,7 +74,13 @@ class CopperThiefDlg(Dialog):
         self.m_labelPattern = StaticText(self, ID_ANY, u"Thieving pattern  ", DefaultPosition, DefaultSize, 0)
         self.m_labelPattern.Wrap(-1)
 
-        self.m_pattern_list = [ u"Squares", u"Dots in square grid", u"Dots in triangular grid", u"Hexagons"]
+        self.m_pattern_list = [
+            u"Squares",
+            u"Dots in square grid",
+            u"Dots in triangular grid",
+            u"Hexagons",
+            u"Diamonds",
+        ]
         self.m_pattern = ComboBox( self, ID_ANY, self.m_pattern_list[copper_thief_defaults.default_pattern],
                                   DefaultPosition, DefaultSize, self.m_pattern_list)
         self.m_pattern.SetMinSize(Size(200, -1))
