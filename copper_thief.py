@@ -145,7 +145,7 @@ class Dotter():
 
     def __init__(self, pattern: int):
         self.pcb = pcbnew.GetBoard()
-        self.pattern = pattern # [ u"Squares", u"Dots in square grid", u"Dots in triangular grid"]
+        self.pattern = pattern # [ u"Squares", u"Dots in square grid", u"Dots in triangular grid", u"Hexagons"]
 
     def apply_dots(self, zone, spacing=2, radius=0.5, clearance_multiplier=3):
         """Iterate over the zone area and add dots if inside the zone."""
@@ -209,7 +209,7 @@ class Dotter():
         
         spacingX = spacing
         
-        if self.pattern == 2:
+        if self.pattern >= 2:
             spacingY = math.cos(math.radians(30)) * spacing
             offsetX = 0.5 * spacing
         else:
@@ -255,7 +255,17 @@ class Dotter():
         """Create a dot."""
         print(f"Creating dot at {x}, {y} with radius {r}")
 
-        if not self.pattern == 0:
+        if self.pattern == 0:
+            start = pcbnew.VECTOR2I(FromMM(x-r), FromMM(y-r))
+            end = pcbnew.VECTOR2I(FromMM(x+r), FromMM(y+r))
+            dot = pcbnew.PCB_SHAPE(self.pcb)
+            dot.SetShape(pcbnew.S_RECT)
+            dot.SetLayer(layer)
+            dot.SetStart(start)
+            dot.SetEnd(end)
+            dot.SetWidth(width)
+            dot.SetFilled(True)
+        elif self.pattern <= 2:
             center = pcbnew.VECTOR2I(FromMM(x), FromMM(y))
             start = pcbnew.VECTOR2I(FromMM(x + r), FromMM(y))
             dot = pcbnew.PCB_SHAPE(self.pcb)
@@ -267,13 +277,13 @@ class Dotter():
             dot.SetCenter(center)
             dot.SetFilled(True)
         else:
-            start = pcbnew.VECTOR2I(FromMM(x-r), FromMM(y-r))
-            end = pcbnew.VECTOR2I(FromMM(x+r), FromMM(y+r))
+            wxPointList = pcbnew.VECTOR_VECTOR2I()
+            for alpha in range(0,360,60):
+                wxPointList.append(pcbnew.VECTOR2I(FromMM(x + r*math.sin(math.radians(alpha))), FromMM(y + r*math.cos(math.radians(alpha)))))
             dot = pcbnew.PCB_SHAPE(self.pcb)
-            dot.SetShape(pcbnew.S_RECT)
+            dot.SetShape(pcbnew.S_POLYGON)
             dot.SetLayer(layer)
-            dot.SetStart(start)
-            dot.SetEnd(end)
+            dot.SetPolyPoints(wxPointList)
             dot.SetWidth(width)
             dot.SetFilled(True)
         
