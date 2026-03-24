@@ -8,6 +8,7 @@ plating process. More detail [here](https://electronics.stackexchange.com/questi
 ## Installation:
 
 **Updated for KiCad 9**
+
 Clone the repository into your local plugin folder for your KiCad major version:
 
 - Linux: `~/.local/share/kicad/9.0/scripting/plugins/` (or `8.0`)
