@@ -13,6 +13,24 @@ THIEVING_ZONENAMES = ['thieving', 'theiving', 'thief', 'theif', 'dotsarray']
 THIEVING_GROUPNAME = 'copper-thief-group'
 
 
+def board_zones(board):
+    try:
+        return board.Zones()
+    except AttributeError:
+        return board.GetZones()
+
+
+def board_groups(board):
+    try:
+        return board.Groups()
+    except AttributeError:
+        return board.GetGroups()
+
+
+def to_int_or_zero(value) -> int:
+    return int(value or 0)
+
+
 def FromMM(x) -> int:
     return int(pcbnew.FromMM(float(x)))
 
@@ -44,7 +62,7 @@ class StreamToLogger(object):
 
 # set up logger
 logging.basicConfig(level=logging.DEBUG,
-                    filename="thief.log",
+                    filename=os.path.join(os.path.dirname(__file__), "thief.log"),
                     filemode='w',
                     format='%(asctime)s %(name)s %(lineno)d:%(message)s',
                     datefmt='%m-%d %H:%M:%S')
@@ -98,8 +116,11 @@ class Copper_Thief(pcbnew.ActionPlugin):
         try:
             parent_frame = [x for x in windows if 'pcbnew' in x.GetTitle().lower()][0]
         except IndexError:
-            # Kicad 6 window title is "pcb editor"
-            parent_frame = [x for x in windows if 'pcb editor' in x.GetTitle().lower()][0]
+            try:
+                # Kicad 6+ window title is usually "PCB Editor"
+                parent_frame = [x for x in windows if 'pcb editor' in x.GetTitle().lower()][0]
+            except IndexError:
+                parent_frame = wx.GetActiveWindow() or (windows[0] if windows else None)
                 
         print(parent_frame)
         aParameters = CopperThief_Dlg(parent_frame)
@@ -117,27 +138,47 @@ class Copper_Thief(pcbnew.ActionPlugin):
             clearance = float(aParameters.m_clearance.GetValue())
             pattern = int(aParameters.m_pattern.GetCurrentSelection())
             cleanup = bool(aParameters.m_cleanup.GetValue() == wx.CHK_CHECKED)
+            pattern_labels = {
+                0: "squares",
+                1: "circles",
+                2: "circles",
+                3: "hexagons",
+                4: "diamonds",
+                5: "diamonds",  # legacy index fallback
+            }
             
             logger.info(f"Spacing {spacing}")
             zones = []
-            for z in board.Zones():
+            for z in board_zones(board):
                 if z.IsSelected():
                     zones.append(z)
 
             dotter = Dotter(pattern)
+            total_created = 0
+            processed_zones = 0
             for zone in zones:
                 zonename = zone.GetZoneName()
                 if zonename.lower() in THIEVING_ZONENAMES:
+                    processed_zones += 1
                     zone_backup = zone.Duplicate()
-                    dotter.apply_dots(zone, spacing=spacing, radius=radius, clearance_multiplier=clearance)
+                    created = dotter.apply_dots(zone, spacing=spacing, radius=radius, clearance_multiplier=clearance)
+                    total_created += created
                     board.Add(zone_backup)
                     if cleanup:
                         board.Remove(zone_backup)
                     board.Remove(zone)
                     filler = pcbnew.ZONE_FILLER(board)
-                    filler.Fill(board.Zones())
+                    filler.Fill(board_zones(board))
                 else:
-                    wx.MessageBox("Zone name must be \"theiving\".", "Check zone name.", wx.OK)
+                    wx.MessageBox("Zone name must be \"thieving\".", "Please check your zone name.", wx.OK)
+
+            if processed_zones > 0:
+                shape_name = pattern_labels.get(pattern, "shapes")
+                wx.MessageBox(
+                    f"Created {total_created} {shape_name} across {processed_zones} zone(s).",
+                    "Copper Thief complete",
+                    wx.OK | wx.ICON_INFORMATION
+                )
         aParameters.Destroy()
 
 
@@ -145,18 +186,29 @@ class Dotter():
 
     def __init__(self, pattern: int):
         self.pcb = pcbnew.GetBoard()
-        self.pattern = pattern # [ u"Squares", u"Dots in square grid", u"Dots in triangular grid", u"Hexagons"]
+        self.pattern = pattern # [ u"Squares", u"Dots in square grid", u"Dots in triangular grid", u"Hexagons", u"Diamonds"]
 
-    def apply_dots(self, zone, spacing=2, radius=0.5, clearance_multiplier=3):
+    def _shape_radius_multiplier(self) -> float:
+        # Keep dot diameter as the single user control; tune only new shapes so
+        # copper coverage is closer to circles at the same nominal diameter.
+        multipliers = {
+            4: math.sqrt(math.pi/2),  # diamonds (area of rhombus with diagonal radius)
+            5: math.sqrt(math.pi/2),  # legacy index fallback
+        }
+        return multipliers.get(self.pattern, 1.0)
+
+    def apply_dots(self, zone, spacing: float = 2, radius: float = 0.5, clearance_multiplier: float = 3):
         """Iterate over the zone area and add dots if inside the zone."""
-        zones = self.pcb.Zones()
+        zones = board_zones(self.pcb)
         layer = zone.GetLayer()
+        created_count = 0
+        shape_radius = radius * self._shape_radius_multiplier()
         
         maxerror = 1
         
         self.group = None
         
-        for group in self.pcb.Groups():
+        for group in board_groups(self.pcb):
             if group.GetName() == THIEVING_GROUPNAME:
                 self.group = group
         
@@ -178,19 +230,19 @@ class Dotter():
                     list([
                         ToMM(p.GetX()),
                         ToMM(p.GetY()),
-                        ToMM(max(p.GetDrillSizeX(),p.GetDrillSizeY()) / 2 + (p.GetLocalClearance() or 0))
+                        ToMM(max(p.GetDrillSizeX(), p.GetDrillSizeY()) / 2 + to_int_or_zero(p.GetLocalClearance()))
                     ])
                 )
 
         
         # Get the zone outline and deflate it so we don't put dots to close to the outside
         zone_outline = zone.Outline()
-        zone_outline.Deflate(FromMM(self.clearance_factor * radius), 16, maxerror)
+        zone_outline.Deflate(FromMM(self.clearance_factor * shape_radius), 16, maxerror)
         zone.SetOutline(zone_outline)
         
         # Increase the clearance so we move even further away from existing copper
-        clearance = zone.GetLocalClearance()
-        zone.SetLocalClearance(clearance + int(FromMM(self.clearance_factor * radius)))
+        clearance = to_int_or_zero(zone.GetLocalClearance())
+        zone.SetLocalClearance(clearance + int(FromMM(self.clearance_factor * shape_radius)))
         zone.SetNeedRefill(True)
         filler = pcbnew.ZONE_FILLER(self.pcb)
         filler.Fill(zones)
@@ -199,22 +251,29 @@ class Dotter():
         zonepolys = zone.GetFilledPolysList(layer)
 
         board_edge = pcbnew.SHAPE_POLY_SET()
-        self.pcb.GetBoardPolygonOutlines(board_edge)
-        board_edge.Deflate(FromMM(self.clearance_factor * radius), 16, maxerror)
+        try:
+            self.pcb.GetBoardPolygonOutlines(board_edge)
+        except TypeError:
+            self.pcb.GetBoardPolygonOutlines(board_edge, False)
+        board_edge.Deflate(FromMM(self.clearance_factor * shape_radius), 16, maxerror)
 
         # Find any keep out zones to check later when we're dotting
         keep_out_zones = []
         for koz in zones:
-            if koz.GetIsRuleArea():
+            if hasattr(koz, 'GetIsRuleArea') and koz.GetIsRuleArea():
+                keep_out_zones.append(koz)
+            elif hasattr(koz, 'IsRuleArea') and koz.IsRuleArea():
                 keep_out_zones.append(koz)
         
-        spacingX = spacing
+        min_center_pitch = 2.0 * shape_radius
+        spacing_center = max(spacing, min_center_pitch)
+        spacingX = spacing_center
         
-        if self.pattern >= 2:
-            spacingY = math.cos(math.radians(30)) * spacing
-            offsetX = 0.5 * spacing
+        if self.pattern == 2:
+            spacingY = math.cos(math.radians(30)) * spacing_center
+            offsetX = 0.5 * spacing_center
         else:
-            spacingY = spacing
+            spacingY = spacing_center
             offsetX = 0
         
         # Iterate over the bounding box of the chosen zone
@@ -231,25 +290,27 @@ class Dotter():
                     # Check that the dot wont touch any keep out zones
                     touch_keepout = False
                     for koz in keep_out_zones:
-                        if koz.Outline().Collide(coords, FromMM(self.clearance_factor * radius)):
+                        if koz.Outline().Collide(coords, FromMM(self.clearance_factor * shape_radius)):
                             touch_keepout = True
                     
                     # Check for enough clearance around NPTH
                     touch_npth = False
                     for npth in npth_pad_coords:
-                        if touching_npth(npth, x_offs, y, self.clearance_factor * radius):
+                        if touching_npth(npth, x_offs, y, self.clearance_factor * shape_radius):
                             touch_npth = True
                     
                     if not touch_keepout and not touch_npth:
-                        dot = self.create_dot(layer, x_offs, y, radius, 0)
+                        dot = self.create_dot(layer, x_offs, y, shape_radius, 0)
                         self.pcb.Add(dot)
+                        created_count += 1
         
         # Reset the zone clearance
         zone.SetLocalClearance(clearance)
         zone.SetNeedRefill(True)
         filler = pcbnew.ZONE_FILLER(self.pcb)
-        filler.Fill(self.pcb.Zones())
+        filler.Fill(board_zones(self.pcb))
         pcbnew.Refresh()
+        return created_count
         # self.RefillBoardAreas()
 
     def create_dot(self, layer, x, y, r, width):
@@ -277,6 +338,29 @@ class Dotter():
             dot.SetWidth(width)
             dot.SetCenter(center)
             dot.SetFilled(True)
+        elif self.pattern == 3:
+            wxPointList = pcbnew.VECTOR_VECTOR2I()
+            for alpha in range(0,360,60):
+                wxPointList.append(pcbnew.VECTOR2I(FromMM(x + r*math.sin(math.radians(alpha))), FromMM(y + r*math.cos(math.radians(alpha)))))
+            dot = pcbnew.PCB_SHAPE(self.pcb)
+            dot.SetShape(pcbnew.S_POLYGON)
+            dot.SetLayer(layer)
+            dot.SetPolyPoints(wxPointList)
+            dot.SetWidth(width)
+            dot.SetFilled(True)
+        elif self.pattern in (4, 5):
+            wxPointList = pcbnew.VECTOR_VECTOR2I()
+            wxPointList.append(pcbnew.VECTOR2I(FromMM(x), FromMM(y - r)))
+            wxPointList.append(pcbnew.VECTOR2I(FromMM(x + r), FromMM(y)))
+            wxPointList.append(pcbnew.VECTOR2I(FromMM(x), FromMM(y + r)))
+            wxPointList.append(pcbnew.VECTOR2I(FromMM(x - r), FromMM(y)))
+
+            dot = pcbnew.PCB_SHAPE(self.pcb)
+            dot.SetShape(pcbnew.S_POLYGON)
+            dot.SetLayer(layer)
+            dot.SetPolyPoints(wxPointList)
+            dot.SetWidth(width)
+            dot.SetFilled(True)
         else:
             wxPointList = pcbnew.VECTOR_VECTOR2I()
             for alpha in range(0,360,60):
@@ -288,7 +372,8 @@ class Dotter():
             dot.SetWidth(width)
             dot.SetFilled(True)
         
-        self.group.AddItem(dot)
+        if self.group is not None:
+            self.group.AddItem(dot)
         return dot
 
     def RefillBoardAreas(self):
