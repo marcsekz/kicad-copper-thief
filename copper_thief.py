@@ -168,7 +168,7 @@ class Copper_Thief(pcbnew.ActionPlugin):
                         board.Remove(zone_backup)
                     board.Remove(zone)
                     filler = pcbnew.ZONE_FILLER(board)
-                    filler.Fill(board.Zones())
+                    filler.Fill(board_zones(board))
                 else:
                     wx.MessageBox("Zone name must be \"thieving\".", "Please check your zone name.", wx.OK)
 
