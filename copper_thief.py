@@ -99,7 +99,7 @@ class Copper_Thief(pcbnew.ActionPlugin):
         self.name = "Copper Thief"
         self.category = "Modify PCB"
         self.description = "Replace a zone with dots"
-        self.icon_file_name = os.path.join(os.path.dirname(__file__), "./imgiii.png")
+        self.icon_file_name = os.path.join(os.path.dirname(__file__), "./dots_icon.png")
         self.show_toolbar_button = True
 
     def Warn(self, message, caption='Warning!'):
