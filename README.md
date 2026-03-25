@@ -13,7 +13,7 @@ Clone the repository into your local plugin folder for your KiCad major version:
 
 - Linux: `~/.local/share/kicad/9.0/scripting/plugins/` (or `8.0`)
 - macOS: `~/Documents/KiCad/9.0/scripting/plugins/` (or `8.0`)
-- Windows: `%HOME%\Documents\KiCad\9.0\scripting\plugins\` (or `8.0`)
+- Windows: `%USERPROFILE%\Documents\KiCad\9.0\scripting\plugins\` (or `8.0`)
 
 
 ## Usage:
